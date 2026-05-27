@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "my-coding-team"
+version = "0.1.0"
+description = "A phased multi-agent coding workflow built on AgentScope v2."
+readme = "myCodingTeam.md"
+requires-python = ">=3.11"
+dependencies = [
+  "agentscope>=2.0",
+  "pydantic>=2.0",
+]
+
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0",
+  "pytest-asyncio>=0.23",
+]
+
+[project.scripts]
+my-coding-team = "my_coding_team.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["my_coding_team*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_mode = "auto"
