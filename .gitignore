@@ -9,3 +9,11 @@ __pycache__/
 .ruff_cache/
 .coverage
 htmlcov/
+.my_coding_team/
+
+# Markdown policy: keep prompts and future README files tracked.
+*.md
+!/README.md
+!my_coding_team/prompts/
+!my_coding_team/prompts/*.md
+!my_coding_team/prompts/**/*.md
