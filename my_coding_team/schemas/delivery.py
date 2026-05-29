@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import Field
+from pydantic import Field, model_validator
 
 from my_coding_team.schemas.common import Confidence, Evidence, StrictBaseModel
 from my_coding_team.schemas.review import FinalReviewReport
@@ -52,3 +52,14 @@ class DeliveryPackage(StrictBaseModel):
     review: FinalReviewReport | None = None
     risks: list[str] = Field(default_factory=list)
     llm_calls_used: int = Field(default=0, ge=0)
+    workflow_kind: Literal["direct_answer", "review_only", "lightweight", "full"] | None = None
+    red_results: list[dict] = Field(default_factory=list)
+    pm_overrides: list[dict] = Field(default_factory=list)
+    diagnostics: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_review_only_no_writes(self) -> "DeliveryPackage":
+        """Review-only delivery must never report file writes."""
+        if self.workflow_kind == "review_only" and self.changed_files:
+            raise ValueError("review_only workflow must produce empty changed_files")
+        return self

@@ -13,7 +13,6 @@ import subprocess
 import tempfile
 from pathlib import Path
 
-from my_coding_team.agents.task_implementation import call_task_implementation
 from my_coding_team.orchestration.pm_orchestrator import run_request
 from my_coding_team.orchestration.task_runner import run_single_task
 from my_coding_team.runtime.llm_client import OpenAICompatibleModel
@@ -66,7 +65,7 @@ async def permission_negative_smoke() -> dict:
     )
     contract = TaskContract(
         task_id="T1",
-        objective="Attempt a malicious write outside the contract.",
+        goal="Attempt a malicious write outside the contract.",
         allowed_files=["README.md"],
         verification_commands=["python -m pytest"],
     )
@@ -90,7 +89,7 @@ async def verification_negative_smoke() -> dict:
     model = RealLlmForcedPayload(
         {
             "task_id": "T1",
-            "objective": "Make README fail verification.",
+            "goal": "Make README fail verification.",
             "allowed_files": ["README.md"],
             "verification_commands": ["python -m pytest tests/test_expected_text.py"],
         },

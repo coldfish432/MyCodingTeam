@@ -7,7 +7,7 @@ from my_coding_team.runtime.agentscope_adapter import (
     PermissionBehavior,
     PermissionRule,
 )
-from my_coding_team.schemas.task import TaskContract
+from my_coding_team.schemas.task import TaskContract, TaskRepairContract
 
 
 READONLY_BASH_PREFIXES = [
@@ -152,7 +152,7 @@ def to_bash_prefix(command: str) -> str | None:
 
 
 def build_task_allow_rules(
-    contract: TaskContract,
+    contract: TaskContract | TaskRepairContract,
     *,
     source: str = "task_contract",
 ) -> dict[str, list[PermissionRule]]:
@@ -171,12 +171,37 @@ def build_task_allow_rules(
     File patterns are intentionally repository-relative. Absolute paths and
     parent traversal are rejected before rules reach AgentScope.
     """
-    file_patterns = [_normalize_allowed_file_pattern(path) for path in contract.allowed_files]
+    allowed_files = list(contract.allowed_files)
+    if getattr(contract, "extend_allowed_files_to_red", False):
+        allowed_files = [*allowed_files, *getattr(contract, "red_allowed_files", [])]
+    file_patterns = [_normalize_allowed_file_pattern(path) for path in allowed_files]
     bash_patterns = [
         prefix
         for command in contract.verification_commands
         if (prefix := to_bash_prefix(command)) is not None
     ]
+
+    rules: dict[str, list[PermissionRule]] = {
+        "Read": [allow("Read", "**", source)],
+        "Grep": [allow("Grep", "**", source)],
+        "Glob": [allow("Glob", "**", source)],
+        "Write": [allow("Write", pattern, source) for pattern in file_patterns],
+        "Edit": [allow("Edit", pattern, source) for pattern in file_patterns],
+    }
+    if bash_patterns:
+        rules["Bash"] = [allow("Bash", pattern, source) for pattern in bash_patterns]
+    return _dedupe_rules(rules)
+
+
+def build_tdd_permission_rules(
+    contract: TaskContract,
+    *,
+    source: str = "tdd_contract",
+) -> dict[str, list[PermissionRule]]:
+    """Build allow rules for RED test writing and verification."""
+    file_patterns = [_normalize_allowed_file_pattern(path) for path in contract.red_allowed_files]
+    command = contract.red_verification_command or (contract.verification_commands[0] if contract.verification_commands else "")
+    bash_patterns = [prefix] if (prefix := to_bash_prefix(command)) is not None else []
 
     rules: dict[str, list[PermissionRule]] = {
         "Read": [allow("Read", "**", source)],

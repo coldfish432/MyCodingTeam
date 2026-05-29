@@ -6,7 +6,7 @@ from my_coding_team.orchestration.permission_builder import (
     build_task_allow_rules,
     to_bash_prefix,
 )
-from my_coding_team.schemas.task import TaskContract
+from my_coding_team.schemas.task import TaskContract, TaskRepairContract
 
 
 def _contents(rules, tool_name):
@@ -42,7 +42,7 @@ def test_to_bash_prefix(command, expected):
 def test_build_task_allow_rules_maps_contract_to_file_and_bash_rules():
     contract = TaskContract(
         task_id="T1",
-        objective="Edit docs",
+        goal="Edit docs",
         allowed_files=["README.md", "docs/"],
         verification_commands=["pytest tests/test_docs.py", "npm run build"],
     )
@@ -58,7 +58,7 @@ def test_build_task_allow_rules_maps_contract_to_file_and_bash_rules():
 def test_build_task_allow_rules_deduplicates_repeated_rules():
     contract = TaskContract(
         task_id="T1",
-        objective="Edit docs",
+        goal="Edit docs",
         allowed_files=["README.md", "README.md"],
         verification_commands=["pytest tests/a.py", "pytest tests/b.py"],
     )
@@ -84,7 +84,7 @@ def test_build_task_allow_rules_deduplicates_repeated_rules():
 def test_build_task_allow_rules_rejects_dangerous_paths(bad_path):
     contract = TaskContract(
         task_id="T1",
-        objective="Edit file",
+        goal="Edit file",
         allowed_files=[bad_path],
     )
 
@@ -95,7 +95,7 @@ def test_build_task_allow_rules_rejects_dangerous_paths(bad_path):
 def test_empty_verification_commands_do_not_create_bash_rules():
     contract = TaskContract(
         task_id="T1",
-        objective="Edit file",
+        goal="Edit file",
         allowed_files=["README.md"],
         verification_commands=[""],
     )
@@ -103,3 +103,31 @@ def test_empty_verification_commands_do_not_create_bash_rules():
     rules = build_task_allow_rules(contract)
 
     assert "Bash" not in rules
+
+
+def test_repair_contract_extends_permissions_to_red_files_only_when_requested():
+    contract = TaskRepairContract(
+        original_task_id="T1",
+        reason="Fix RED test quality before delivery.",
+        allowed_files=["utils/calc.py"],
+        red_allowed_files=["tests/test_calc.py"],
+        extend_allowed_files_to_red=True,
+    )
+
+    rules = build_task_allow_rules(contract)
+
+    assert _contents(rules, "Write") == ["utils/calc.py", "tests/test_calc.py"]
+
+
+def test_repair_contract_keeps_red_files_out_without_extension_flag():
+    contract = TaskRepairContract(
+        original_task_id="T1",
+        reason="Fix production bug.",
+        allowed_files=["utils/calc.py"],
+        red_allowed_files=["tests/test_calc.py"],
+        extend_allowed_files_to_red=False,
+    )
+
+    rules = build_task_allow_rules(contract)
+
+    assert _contents(rules, "Write") == ["utils/calc.py"]

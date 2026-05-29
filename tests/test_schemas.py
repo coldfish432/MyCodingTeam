@@ -76,7 +76,7 @@ def test_confidence_bounds_are_enforced_with_field_location():
 
 def test_task_contract_requires_allowed_files():
     with pytest.raises(ValidationError) as exc_info:
-        TaskContract(task_id="T1", objective="Edit file", allowed_files=[])
+        TaskContract(task_id="T1", goal="Edit file", allowed_files=[])
 
     assert _first_loc(exc_info.value) == ("allowed_files",)
     assert "allowed_files must not be empty" in str(exc_info.value)

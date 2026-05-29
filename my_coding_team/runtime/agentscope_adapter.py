@@ -1,7 +1,7 @@
 """Narrow import adapter for AgentScope v2.
 
-Business modules should import AgentScope symbols from here so the rest of the
-codebase has a single boundary to update if the runtime API shifts.
+Business modules import AgentScope symbols from here so runtime API changes have
+one boundary. This project requires AgentScope 2.x; no 1.x fallback is provided.
 """
 
 from __future__ import annotations

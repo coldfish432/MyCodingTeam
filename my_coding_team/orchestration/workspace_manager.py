@@ -46,6 +46,11 @@ def inspect_git_workspace(workdir: str | Path) -> WorkspaceRecord:
     )
 
 
+def prepare_workspace_readonly(workdir: str | Path) -> WorkspaceRecord:
+    """Prepare a read-only workspace record; dirty files are valid context."""
+    return inspect_git_workspace(workdir)
+
+
 @asynccontextmanager
 async def local_workspace(workdir: str | Path):
     """创建并关闭 AgentScope LocalWorkspace。

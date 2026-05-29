@@ -111,6 +111,7 @@ class DeterministicModel:
         self.text = text
         self._json_outputs = list(json_outputs or [])
         self.calls = 0
+        self.prompts: list[str] = []
 
     async def complete_text(self, prompt: str) -> str:
         """返回固定文本并记录调用次数。
@@ -122,6 +123,7 @@ class DeterministicModel:
             初始化时提供的 text。
         """
         self.calls += 1
+        self.prompts.append(prompt)
         return self.text
 
     async def complete_json(self, prompt: str) -> dict[str, Any]:
@@ -134,6 +136,7 @@ class DeterministicModel:
             下一条 JSON；队列为空时返回空 dict。
         """
         self.calls += 1
+        self.prompts.append(prompt)
         if self._json_outputs:
             return self._json_outputs.pop(0)
         return {}

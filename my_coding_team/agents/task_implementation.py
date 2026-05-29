@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import fnmatch
+import json
 from pathlib import Path
 from typing import Any
 
@@ -12,7 +13,7 @@ from my_coding_team.schemas.common import Evidence
 from my_coding_team.schemas.task import ImplementationResult, TaskContract, TaskRepairContract
 
 
-async def call_task_implementation(
+async def run_task_implementation(
     contract: TaskContract | TaskRepairContract,
     workspace_root: str | Path,
     model=None,
@@ -39,7 +40,9 @@ async def call_task_implementation(
         )
     prompt = (
         f"{load_prompt('task_implementation')}\n\n"
-        f"Contract:\n{contract.model_dump_json(indent=2)}"
+        f"Contract:\n{contract.model_dump_json(indent=2)}\n\n"
+        f"Allowed file current contents:\n"
+        f"{json.dumps(_allowed_file_snapshots(Path(workspace_root), contract.allowed_files), indent=2)}"
     )
     payload = await model.complete_json(prompt)
     changes = payload.get("changes", [])
@@ -92,19 +95,56 @@ def _apply_changes(root: Path, allowed_files: list[str], changes: list[dict[str,
     异常：
         PermissionError: 路径为空、绝对路径、父级穿越或不在 allowed_files 内。
     """
-    changed: list[str] = []
+    prepared: list[tuple[str, str]] = []
     for change in changes:
         rel_path = str(change.get("path", "")).replace("\\", "/").strip()
-        # 先挡住路径穿越和绝对路径，再做 allowed_files 模式匹配。
         if not rel_path or rel_path.startswith("../") or Path(rel_path).is_absolute():
             raise PermissionError(f"Refusing unsafe path: {rel_path}")
         if not _is_allowed(rel_path, allowed_files):
             raise PermissionError(f"Path is outside allowed_files: {rel_path}")
+        prepared.append((rel_path, str(change.get("content", ""))))
+
+    changed: list[str] = []
+    for rel_path, content in prepared:
         target = root / rel_path
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(str(change.get("content", "")), encoding="utf-8")
+        target.write_text(content, encoding="utf-8")
         changed.append(rel_path)
     return changed
+
+
+def _allowed_file_snapshots(root: Path, allowed_files: list[str]) -> dict[str, str]:
+    """Read current contents for allowed files so complete replacements preserve context."""
+    snapshots: dict[str, str] = {}
+    for path in _snapshot_candidates(root, allowed_files):
+        try:
+            snapshots[path.as_posix()] = (root / path).read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            snapshots[path.as_posix()] = "<binary or non-utf8 file omitted>"
+        if len(snapshots) >= 20:
+            break
+    return snapshots
+
+
+def _snapshot_candidates(root: Path, allowed_files: list[str]) -> list[Path]:
+    candidates: list[Path] = []
+    for pattern in allowed_files:
+        normalized = pattern.replace("\\", "/").strip()
+        if not normalized or normalized.startswith("../") or Path(normalized).is_absolute():
+            continue
+        if any(char in normalized for char in "*?[]") or normalized.endswith("/"):
+            glob_pattern = f"{normalized.rstrip('/')}/*" if normalized.endswith("/") else normalized
+            matches = [
+                path.relative_to(root)
+                for path in root.glob(glob_pattern)
+                if path.is_file() and path.is_relative_to(root)
+            ]
+            candidates.extend(matches)
+            continue
+        path = root / normalized
+        if path.is_file():
+            candidates.append(Path(normalized))
+    return sorted(dict.fromkeys(candidates), key=lambda item: item.as_posix())
 
 
 def _is_allowed(path: str, allowed_files: list[str]) -> bool:

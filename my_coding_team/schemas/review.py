@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import Field, model_validator
 
 from my_coding_team.schemas.common import Evidence, RiskLevel, StrictBaseModel
@@ -70,3 +72,14 @@ class FinalReviewReport(StrictBaseModel):
         if any(finding.must_fix for finding in self.findings) and self.approval:
             raise ValueError("FinalReviewReport cannot approve unresolved must_fix findings")
         return self
+
+
+class ReviewOnlyReport(StrictBaseModel):
+    """Read-only review report for Phase 10."""
+
+    finding: ReviewFinding
+    review_target_kind: Literal["file_list", "workspace_diff", "pasted_text"]
+    input_summary: str
+    should_fix: list[str] = Field(default_factory=list)
+    nice_to_have: list[str] = Field(default_factory=list)
+    next_step_hint: str | None = None

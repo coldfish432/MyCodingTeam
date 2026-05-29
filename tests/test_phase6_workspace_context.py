@@ -3,8 +3,11 @@ from pathlib import Path
 
 import pytest
 
-from my_coding_team.agents.context_scout import call_context_scout
+from my_coding_team.agents import context_scout as _context_scout  # noqa: F401
+from my_coding_team.core.registry import STEPS
+from my_coding_team.core.step import StepContext
 from my_coding_team.orchestration.workspace_manager import inspect_git_workspace, local_workspace
+from my_coding_team.schemas.step_inputs import ContextScoutInput
 
 
 def _init_repo(path: Path) -> None:
@@ -36,7 +39,10 @@ async def test_context_scout_outputs_evidence(tmp_path: Path):
     (tmp_path / "README.md").write_text("hello\n", encoding="utf-8")
     record = inspect_git_workspace(tmp_path)
 
-    context = await call_context_scout("inspect repo", record)
+    context = await STEPS["context_scout"].run(
+        ContextScoutInput(request="inspect repo", workspace=record),
+        StepContext(workspace_root=record.root),
+    )
 
     assert "README.md" in context.relevant_files
     assert context.evidence

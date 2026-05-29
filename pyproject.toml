@@ -29,3 +29,4 @@ include = ["my_coding_team*"]
 testpaths = ["tests"]
 addopts = "-q"
 asyncio_mode = "auto"
+norecursedirs = ["tests/smoke/fixtures"]

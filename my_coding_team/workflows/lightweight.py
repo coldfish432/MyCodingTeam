@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from my_coding_team.agents.context_scout import call_context_scout
+import my_coding_team.agents.context_scout  # noqa: F401
+import my_coding_team.agents.planning  # noqa: F401
 from my_coding_team.agents.delivery import build_delivery_package
-from my_coding_team.agents.planning import call_planning_for_single_contract
-from my_coding_team.orchestration.task_runner import run_single_task
+from my_coding_team.core.registry import STEPS
+from my_coding_team.core.step import StepContext
+from my_coding_team.orchestration.task_runner import run_single_task_with_red
 from my_coding_team.orchestration.workspace_manager import inspect_git_workspace
+from my_coding_team.schemas.step_inputs import ContextScoutInput, PlanningSingleInput
 from my_coding_team.schemas.workflow import TeamState
 
 
@@ -26,15 +29,31 @@ async def run_lightweight(state: TeamState, *, workspace_root: str | Path, model
     workspace = inspect_git_workspace(workspace_root)
     state.workspace = workspace
     state.current_phase = "workspace_prepared"
-    repo_context = await call_context_scout(state.request, workspace, model=None)
+    ctx = StepContext(workspace_root=workspace.root, model=model)
+    repo_context = await STEPS["context_scout"].run(
+        ContextScoutInput(request=state.request, workspace=workspace),
+        ctx,
+    )
     state.repo_context = repo_context
     state.current_phase = "context_collected"
-    contract = await call_planning_for_single_contract(state.request, repo_context, workspace, model=model)
+    contract = await STEPS["planning_single"].run(
+        PlanningSingleInput(
+            request=state.request,
+            repo_context=repo_context.model_dump(),
+            workspace=workspace,
+        ),
+        ctx,
+    )
     state.artifacts["task_contract"] = contract.model_dump()
     state.current_phase = "planned"
-    if model is not None:
-        state.llm_calls_used += 1
-    result = await run_single_task(contract, workspace.root, implementation_model=model)
+    state.llm_calls_used += ctx.llm_call_charge
+    result = await run_single_task_with_red(
+        contract,
+        workspace.root,
+        state=state,
+        implementation_model=model,
+        repo_context=repo_context,
+    )
     if model is not None:
         state.llm_calls_used += 1 + result.repair_attempts
     state.current_phase = "reviewed"

@@ -95,10 +95,11 @@ def build_parser() -> argparse.ArgumentParser:
     run_parser.add_argument("--workspace", default=None, help="Workspace path. Defaults to current directory.")
     run_parser.add_argument(
         "--mode",
-        choices=["auto", "direct", "lightweight"],
+        choices=["auto", "direct", "lightweight", "full", "review-only", "review_only"],
         default="auto",
         help="Workflow routing mode.",
     )
+    run_parser.add_argument("--paste", action="store_true", help="Read pasted review input from stdin.")
     run_parser.add_argument("--mock", action="store_true", help="Use deterministic local model instead of .env API.")
     return parser
 
@@ -129,6 +130,7 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.command == "run":
         try:
+            pasted_content = sys.stdin.read() if args.paste else None
             model = DeterministicModel(text="Mock direct answer.") if args.mock else OpenAICompatibleModel.from_env()
             package = asyncio.run(
                 run_request(
@@ -137,6 +139,7 @@ def main(argv: list[str] | None = None) -> int:
                     workspace=args.workspace,
                     mode=args.mode,
                     model=model,
+                    pasted_content=pasted_content,
                 ),
             )
         except ModelConfigurationError as exc:
